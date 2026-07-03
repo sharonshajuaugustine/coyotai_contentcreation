@@ -1,0 +1,12 @@
+{
+  "name": "Coyot AI Idea Pool",
+  "short_name": "Coyot Ideas",
+  "description": "Shared video idea board for the Coyot AI Instagram channel",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eafffd",
+  "theme_color": "#c9f0ff",
+  "icons": [
+    { "src": "/kitsune-wallpaper.jpg", "sizes": "1024x1024", "type": "image/jpeg", "purpose": "any" }
+  ]
+}

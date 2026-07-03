@@ -1,26 +1,196 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --pale-sky: #c9f0ff;
+  --azure-mist: #eafffd;
+  --platinum: #efeff0;
+  --thistle: #d5cad6;
+  --taupe-grey: #6b5e62;
+  /* Darker than --taupe-grey specifically for text, so text-taupe/60-80
+     opacity variants still clear WCAG AA against azure-mist/platinum. */
+  --taupe-ink: #4a3d41;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-pale-sky: var(--pale-sky);
+  --color-azure-mist: var(--azure-mist);
+  --color-platinum: var(--platinum);
+  --color-thistle: var(--thistle);
+  --color-taupe: var(--taupe-ink);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  color: var(--taupe-ink);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Fixed watercolor kitsune wallpaper, always present behind the glass UI */
+.wallpaper-bg {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: radial-gradient(circle at 30% 15%, var(--pale-sky) 0%, var(--azure-mist) 40%, var(--platinum) 75%);
+  background-attachment: fixed;
+  position: relative;
+}
+
+.wallpaper-bg::before {
+  content: "";
+  position: fixed;
+  inset: -2%;
+  background-image: url("/kitsune-wallpaper.jpg");
+  background-size: cover;
+  background-position: calc(50% + var(--px, 0px)) calc(50% + var(--py, 0px));
+  opacity: 0.5;
+  z-index: 0;
+  pointer-events: none;
+  transition: background-position 0.3s ease-out;
+}
+
+.wallpaper-bg > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Glass HUD + neumorphism hybrid surface */
+.glass-card {
+  background: color-mix(in srgb, var(--azure-mist) 55%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid color-mix(in srgb, var(--thistle) 60%, transparent);
+  border-radius: 22px;
+  box-shadow:
+    8px 8px 20px color-mix(in srgb, var(--taupe-grey) 12%, transparent),
+    -6px -6px 16px color-mix(in srgb, var(--pale-sky) 55%, transparent);
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    10px 10px 26px color-mix(in srgb, var(--taupe-grey) 16%, transparent),
+    -8px -8px 20px color-mix(in srgb, var(--pale-sky) 65%, transparent);
+}
+
+.glass-input {
+  background: color-mix(in srgb, var(--platinum) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--thistle) 70%, transparent);
+  border-radius: 14px;
+  padding: 0.6rem 0.9rem;
+  color: var(--taupe-grey);
+  outline: none;
+}
+
+.glass-input:focus {
+  border-color: var(--pale-sky);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pale-sky) 45%, transparent);
+}
+
+.glass-button {
+  background: color-mix(in srgb, var(--pale-sky) 60%, var(--azure-mist));
+  border: 1px solid color-mix(in srgb, var(--thistle) 60%, transparent);
+  border-radius: 14px;
+  padding: 0.6rem 1.1rem;
+  color: var(--taupe-grey);
+  font-weight: 600;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 4px 4px 14px color-mix(in srgb, var(--taupe-grey) 14%, transparent);
+}
+
+.glass-pill {
+  background: color-mix(in srgb, var(--platinum) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--thistle) 50%, transparent);
+  border-radius: 999px;
+  backdrop-filter: blur(12px);
+}
+
+@keyframes tile-breathe {
+  0%, 100% { box-shadow: 6px 6px 16px color-mix(in srgb, var(--taupe-grey) 10%, transparent), -6px -6px 14px color-mix(in srgb, var(--pale-sky) 50%, transparent); }
+  50% { box-shadow: 8px 8px 22px color-mix(in srgb, var(--taupe-grey) 14%, transparent), -8px -8px 18px color-mix(in srgb, var(--pale-sky) 60%, transparent); }
+}
+
+.tile-breathe {
+  animation: tile-breathe 6s ease-in-out infinite;
+}
+
+/* Glass intensity scale — [data-glass="subtle"] dials back blur in dense
+   sections (bento grid) so small text stays crisp; "strong" is used for
+   focal surfaces like modals. Default (no attribute) = normal. */
+[data-glass="subtle"] .glass-card {
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+
+[data-glass="strong"] .glass-card {
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+}
+
+/* Distinct active/pressed accent gradient, separate from the base
+   background gradient, used for pressed pills/buttons and pinned tiles. */
+.glass-active {
+  background: linear-gradient(135deg, var(--pale-sky), var(--thistle));
+}
+
+.status-border-pool { border-left: 3px solid var(--pale-sky); }
+.status-border-in_progress { border-left: 3px solid var(--thistle); }
+.status-border-done { border-left: 3px solid var(--azure-mist); }
+.status-border-archived { border-left: 3px solid color-mix(in srgb, var(--taupe-grey) 40%, transparent); }
+
+.density-compact .bento-tile-min {
+  min-height: 70px;
+}
+
+/* A5: subtle grain so glass doesn't read as flat/plasticky. Inline SVG
+   noise, extremely low opacity, purely decorative. */
+.glass-card {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+/* A10: pressed/tactile neumorphic state on click, distinct from hover lift. */
+.glass-button:active,
+.glass-pill:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: inset 3px 3px 8px color-mix(in srgb, var(--taupe-grey) 20%, transparent);
+}
+
+/* C6: respect reduced-motion preference globally. */
+@media (prefers-reduced-motion: reduce) {
+  .tile-breathe {
+    animation: none;
+  }
+  .glass-card,
+  .glass-button,
+  .glass-pill,
+  .wallpaper-bg::before {
+    transition: none !important;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* C4: time-of-day tint applied via a data attribute set from JS (avoids a
+   hydration-mismatch flash from reading the clock during SSR). */
+[data-daytime="night"] .wallpaper-bg::before { filter: saturate(80%) brightness(0.85) hue-rotate(-8deg); }
+[data-daytime="day"] .wallpaper-bg::before { filter: saturate(105%) brightness(1.05) hue-rotate(4deg); }
+
+/* N5: high-contrast alternative theme for low-vision users. */
+[data-contrast="high"] {
+  --taupe-ink: #000000;
+  --taupe-grey: #000000;
+}
+[data-contrast="high"] .glass-card,
+[data-contrast="high"] .glass-input,
+[data-contrast="high"] .glass-pill {
+  background: #ffffff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 2px solid #000000;
+}
+[data-contrast="high"] .wallpaper-bg::before {
+  opacity: 0.12;
 }
