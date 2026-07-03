@@ -317,7 +317,7 @@ function Board() {
 
       {/* Header: logo + the 3 things people actually reach for often */}
       <header className="glass-pill mx-3 mt-3 px-4 py-2 flex items-center justify-between sticky top-3 z-40">
-        <span className="font-semibold text-taupe text-sm">🦊 Coyot AI</span>
+        <span className="font-semibold text-taupe text-sm tracking-wide">Coyot AI</span>
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setView(view === "leaderboard" ? "board" : "leaderboard")}
