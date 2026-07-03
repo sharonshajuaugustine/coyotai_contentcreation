@@ -1,5 +1,5 @@
 "use client";
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import { motion, LayoutGroup } from "framer-motion";
 import type { Idea } from "@/lib/types";
 import { computeWeight, spanForWeight } from "@/lib/weight";
@@ -19,6 +19,7 @@ export default function BentoGrid({
   onQuickAdvance?: (idea: Idea) => void;
 }) {
   const gridRef = useRef<HTMLDivElement>(null);
+  const groupId = useId();
 
   if (ideas.length === 0) {
     return (
@@ -40,7 +41,7 @@ export default function BentoGrid({
   }
 
   return (
-    <LayoutGroup>
+    <LayoutGroup id={groupId}>
       <div
         ref={gridRef}
         data-glass="subtle"
@@ -56,7 +57,6 @@ export default function BentoGrid({
           return (
             <motion.div
               layout
-              layoutId={idea.id}
               key={idea.id}
               data-tile
               tabIndex={0}

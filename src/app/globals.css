@@ -30,8 +30,7 @@ body {
 .wallpaper-bg {
   min-height: 100vh;
   min-height: 100dvh;
-  background: radial-gradient(circle at 30% 15%, var(--pale-sky) 0%, var(--azure-mist) 40%, var(--platinum) 75%);
-  background-attachment: fixed;
+  background: var(--platinum);
   position: relative;
 }
 
@@ -41,21 +40,25 @@ body {
   inset: -2%;
   background-image: url("/kitsune-wallpaper.jpg");
   background-size: cover;
-  background-position: calc(50% + var(--px, 0px)) calc(50% + var(--py, 0px));
-  opacity: 0.5;
+  background-position: calc(50% + var(--px, 0px)) calc(30% + var(--py, 0px));
+  opacity: 0.65;
   z-index: 0;
   pointer-events: none;
   transition: background-position 0.3s ease-out;
 }
 
-.wallpaper-bg > * {
+.wallpaper-bg > *:not(.fixed) {
   position: relative;
   z-index: 1;
 }
 
+.wallpaper-bg > .fixed {
+  z-index: 30;
+}
+
 /* Glass HUD + neumorphism hybrid surface */
 .glass-card {
-  background: color-mix(in srgb, var(--azure-mist) 55%, transparent);
+  background: color-mix(in srgb, var(--azure-mist) 82%, transparent);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   border: 1px solid color-mix(in srgb, var(--thistle) 60%, transparent);
@@ -103,7 +106,7 @@ body {
 }
 
 .glass-pill {
-  background: color-mix(in srgb, var(--platinum) 60%, transparent);
+  background: color-mix(in srgb, var(--platinum) 85%, transparent);
   border: 1px solid color-mix(in srgb, var(--thistle) 50%, transparent);
   border-radius: 999px;
   backdrop-filter: blur(12px);

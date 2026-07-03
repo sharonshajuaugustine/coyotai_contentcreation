@@ -2,7 +2,20 @@
 import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Search, Trophy, Archive as ArchiveIcon, Plus, LayoutGrid, Rows3, Newspaper, Contrast, Copy } from "lucide-react";
+import {
+  Search,
+  Trophy,
+  Archive as ArchiveIcon,
+  Plus,
+  LayoutGrid,
+  Rows3,
+  Newspaper,
+  Contrast,
+  Copy,
+  SlidersHorizontal,
+  MoreVertical,
+  X,
+} from "lucide-react";
 import type { Idea, IdeaStatus } from "@/lib/types";
 import { FORMATS } from "@/lib/types";
 import BentoGrid from "@/components/BentoGrid";
@@ -13,7 +26,7 @@ import GlassSelect from "@/components/GlassSelect";
 import { useIdentity } from "@/lib/useIdentity";
 
 const BOARD_SECTIONS: { key: IdeaStatus; label: string }[] = [
-  { key: "pool", label: "Idea Pool" },
+  { key: "pool", label: "Pool" },
   { key: "in_progress", label: "In Progress" },
   { key: "done", label: "Done" },
 ];
@@ -52,6 +65,8 @@ function Board() {
   const [selected, setSelected] = useState<Idea | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [view, setView] = useState<"board" | "leaderboard" | "archived">("board");
+  const [showFilters, setShowFilters] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [query, setQuery] = useState("");
   const [formatFilter, setFormatFilter] = useState("");
   const [submitterFilter, setSubmitterFilter] = useState("");
@@ -68,6 +83,7 @@ function Board() {
   const [loadingDigest, setLoadingDigest] = useState(false);
   const failCount = useRef(0);
   const wallpaperRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { name } = useIdentity();
 
   const router = useRouter();
@@ -140,6 +156,15 @@ function Board() {
   useEffect(() => {
     const hour = new Date().getHours();
     wallpaperRef.current?.setAttribute("data-daytime", hour >= 19 || hour < 6 ? "night" : "day");
+  }, []);
+
+  // Close the overflow menu on outside click.
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
+    }
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
   }, []);
 
   // Q1: keyboard shortcuts — "n" opens new idea form, Escape closes whatever's open.
@@ -216,7 +241,9 @@ function Board() {
     return out;
   }
 
-  const isFiltering = query.trim().length > 0 || formatFilter !== "" || submitterFilter !== "" || needsCheckInOnly;
+  const activeFilterCount =
+    (formatFilter ? 1 : 0) + (submitterFilter ? 1 : 0) + (needsCheckInOnly ? 1 : 0) + (sort !== "newest" ? 1 : 0);
+  const isFiltering = query.trim().length > 0 || activeFilterCount > 0;
 
   function vibrate() {
     if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(12);
@@ -257,6 +284,7 @@ function Board() {
   }
 
   async function runDigest() {
+    setShowMenu(false);
     setShowDigest(true);
     setLoadingDigest(true);
     try {
@@ -287,62 +315,72 @@ function Board() {
         </div>
       )}
 
+      {/* Header: logo + the 3 things people actually reach for often */}
       <header className="glass-pill mx-3 mt-3 px-4 py-2 flex items-center justify-between sticky top-3 z-40">
-        <span className="font-semibold text-taupe">🦊 Coyot AI Idea Pool</span>
-        <div className="flex gap-2">
-          <button onClick={runDigest} aria-label="Weekly digest" className="glass-pill text-sm px-3 min-h-[44px] flex items-center">
-            <Newspaper size={14} aria-hidden="true" />
-          </button>
+        <span className="font-semibold text-taupe text-sm">🦊 Coyot AI</span>
+        <div className="flex items-center gap-1.5">
           <button
-            onClick={toggleHighContrast}
-            aria-pressed={highContrast}
-            aria-label="Toggle high contrast theme"
-            className="glass-pill text-sm px-3 min-h-[44px] flex items-center"
+            onClick={() => setView(view === "leaderboard" ? "board" : "leaderboard")}
+            aria-pressed={view === "leaderboard"}
+            aria-label="Leaderboard"
+            className={`min-h-[40px] min-w-[40px] rounded-full flex items-center justify-center ${view === "leaderboard" ? "glass-active" : ""}`}
           >
-            <Contrast size={14} aria-hidden="true" />
-          </button>
-          <button
-            onClick={toggleDensity}
-            aria-pressed={density === "compact"}
-            aria-label="Toggle grid density"
-            className="glass-pill text-sm px-3 min-h-[44px] flex items-center"
-          >
-            {density === "compact" ? <Rows3 size={14} aria-hidden="true" /> : <LayoutGrid size={14} aria-hidden="true" />}
+            <Trophy size={16} aria-hidden="true" />
           </button>
           <button
             onClick={() => setView(view === "archived" ? "board" : "archived")}
             aria-pressed={view === "archived"}
-            aria-label="Toggle archived view"
-            className="glass-pill text-sm px-3 min-h-[44px] flex items-center"
+            aria-label="Archived ideas"
+            className={`min-h-[40px] min-w-[40px] rounded-full flex items-center justify-center ${view === "archived" ? "glass-active" : ""}`}
           >
-            <ArchiveIcon size={14} aria-hidden="true" />
+            <ArchiveIcon size={16} aria-hidden="true" />
           </button>
-          <button
-            onClick={() => setView(view === "leaderboard" ? "board" : "leaderboard")}
-            aria-pressed={view === "leaderboard"}
-            aria-label="Toggle leaderboard view"
-            className="glass-pill text-sm px-3 min-h-[44px] flex items-center"
-          >
-            <Trophy size={14} aria-hidden="true" />
-          </button>
-          <button onClick={() => setShowForm(true)} className="glass-button text-sm min-h-[44px] hidden sm:block">
-            + New idea
+
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowMenu((v) => !v)}
+              aria-label="More options"
+              aria-expanded={showMenu}
+              className="min-h-[40px] min-w-[40px] rounded-full flex items-center justify-center"
+            >
+              <MoreVertical size={16} aria-hidden="true" />
+            </button>
+            {showMenu && (
+              <div className="absolute right-0 mt-2 glass-card p-1.5 w-48 z-50 space-y-0.5">
+                <button onClick={runDigest} className="w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-xl hover:bg-white/40">
+                  <Newspaper size={14} aria-hidden="true" /> Weekly digest
+                </button>
+                <button
+                  onClick={() => {
+                    toggleHighContrast();
+                  }}
+                  className="w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-xl hover:bg-white/40"
+                >
+                  <Contrast size={14} aria-hidden="true" /> {highContrast ? "Normal contrast" : "High contrast"}
+                </button>
+                <button
+                  onClick={() => {
+                    toggleDensity();
+                  }}
+                  className="w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-xl hover:bg-white/40"
+                >
+                  {density === "compact" ? <LayoutGrid size={14} aria-hidden="true" /> : <Rows3 size={14} aria-hidden="true" />}
+                  {density === "compact" ? "Comfortable view" : "Compact view"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button onClick={() => setShowForm(true)} aria-label="New idea" className="glass-button text-sm min-h-[40px] px-3 flex items-center gap-1">
+            <Plus size={16} aria-hidden="true" />
+            <span className="hidden sm:inline">New idea</span>
           </button>
         </div>
       </header>
 
-      {/* D4: backlog funnel */}
-      {view === "board" && funnelTotal > 1 && (
-        <div className="mx-3 mt-2 h-2 rounded-full overflow-hidden flex glass-pill" aria-hidden="true">
-          <div style={{ width: `${(poolCount / funnelTotal) * 100}%`, background: "var(--pale-sky)" }} />
-          <div style={{ width: `${(progressCount / funnelTotal) * 100}%`, background: "var(--thistle)" }} />
-          <div style={{ width: `${(doneCount / funnelTotal) * 100}%`, background: "var(--azure-mist)" }} />
-        </div>
-      )}
-
       {showDigest && (
         <div className="glass-card mx-3 mt-3 p-4 text-sm text-taupe/80 relative">
-          <h2 className="text-sm font-semibold text-taupe mb-2">Weekly digest</h2>
+          <h2 className="text-sm font-semibold text-taupe mb-2 pr-6">Weekly digest</h2>
           <p className="whitespace-pre-wrap">{loadingDigest ? "Summarizing the board..." : digest}</p>
           {!loadingDigest && digest && (
             <button
@@ -355,7 +393,9 @@ function Board() {
               <Copy size={12} aria-hidden="true" /> Copy for group chat
             </button>
           )}
-          <button onClick={() => setShowDigest(false)} className="absolute top-3 right-3 text-xs text-taupe/50">close</button>
+          <button onClick={() => setShowDigest(false)} aria-label="Close digest" className="absolute top-3 right-3 min-h-[32px] min-w-[32px] flex items-center justify-center text-taupe/50">
+            <X size={14} aria-hidden="true" />
+          </button>
         </div>
       )}
 
@@ -379,8 +419,23 @@ function Board() {
 
       {view === "board" && (
         <>
-          <div className="flex gap-2 mx-3 mt-3 flex-wrap items-center">
-            <div className="glass-input flex items-center gap-2 flex-1 min-w-[160px] min-h-[44px]">
+          {/* Section tabs first — this is the primary navigation people use constantly */}
+          <nav className="flex gap-2 mx-3 mt-3 lg:hidden" aria-label="Board sections">
+            {BOARD_SECTIONS.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setActiveMobileSection(s.key)}
+                aria-pressed={activeMobileSection === s.key}
+                className={`flex-1 glass-pill text-sm py-2.5 min-h-[44px] ${activeMobileSection === s.key ? "font-bold glass-active" : "opacity-70"}`}
+              >
+                {s.label} ({ideas.filter((i) => i.status === s.key).length})
+              </button>
+            ))}
+          </nav>
+
+          {/* Search + filters toggle — filters collapsed by default so they don't crowd the page */}
+          <div className="flex gap-2 mx-3 mt-3 items-center">
+            <div className="glass-input flex items-center gap-2 flex-1 min-h-[44px]">
               <Search size={14} className="text-taupe/60" aria-hidden="true" />
               <input
                 aria-label="Search ideas"
@@ -390,79 +445,84 @@ function Board() {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <div className="w-36">
-              <GlassSelect
-                value={sort}
-                onChange={(v) => setSort(v as typeof sort)}
-                options={[...SORTS]}
-                placeholder="Sort"
-                ariaLabel="Sort ideas"
-              />
-            </div>
-            <div className="w-36">
-              <GlassSelect
-                value={submitterFilter}
-                onChange={setSubmitterFilter}
-                options={submitters}
-                placeholder="Anyone"
-                ariaLabel="Filter by submitter"
-              />
-            </div>
-            {/* L5/P3: saved filter presets */}
-            {name && (
-              <button
-                onClick={() => setSubmitterFilter(submitterFilter === name ? "" : name)}
-                aria-pressed={submitterFilter === name}
-                className={`glass-pill text-[11px] px-3 min-h-[36px] ${submitterFilter === name ? "font-bold glass-active" : "opacity-70"}`}
-              >
-                My ideas
-              </button>
-            )}
             <button
-              onClick={() => setNeedsCheckInOnly((v) => !v)}
-              aria-pressed={needsCheckInOnly}
-              className={`glass-pill text-[11px] px-3 min-h-[36px] ${needsCheckInOnly ? "font-bold glass-active" : "opacity-70"}`}
+              onClick={() => setShowFilters((v) => !v)}
+              aria-pressed={showFilters}
+              aria-label="Filters"
+              className={`glass-pill min-h-[44px] px-3 flex items-center gap-1 text-sm relative ${showFilters ? "glass-active" : ""}`}
             >
-              Needs check-in
+              <SlidersHorizontal size={14} aria-hidden="true" />
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-taupe text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
-            {FORMATS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setFormatFilter(formatFilter === f.value ? "" : f.value)}
-                aria-pressed={formatFilter === f.value}
-                className={`glass-pill text-[11px] px-3 min-h-[36px] ${formatFilter === f.value ? "font-bold glass-active" : "opacity-70"}`}
-              >
-                {f.label}
-              </button>
-            ))}
-            {isFiltering && (
-              <button
-                onClick={() => {
-                  setQuery("");
-                  setFormatFilter("");
-                  setSubmitterFilter("");
-                  setNeedsCheckInOnly(false);
-                }}
-                className="glass-pill text-[11px] px-3 min-h-[36px] text-red-500/80"
-              >
-                Clear filters
-              </button>
-            )}
           </div>
 
-          {/* Mobile: tab-switch one section at a time */}
-          <nav className="flex gap-2 mx-3 mt-3 flex-wrap lg:hidden" aria-label="Board sections">
-            {BOARD_SECTIONS.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setActiveMobileSection(s.key)}
-                aria-pressed={activeMobileSection === s.key}
-                className={`glass-pill text-sm px-4 min-h-[44px] ${activeMobileSection === s.key ? "font-bold" : "opacity-70"}`}
-              >
-                {s.label} ({ideas.filter((i) => i.status === s.key).length})
-              </button>
-            ))}
-          </nav>
+          {showFilters && (
+            <div className="glass-card mx-3 mt-2 p-3 space-y-2">
+              <div className="flex gap-2 flex-wrap">
+                <div className="w-36">
+                  <GlassSelect value={sort} onChange={(v) => setSort(v as typeof sort)} options={[...SORTS]} placeholder="Sort" ariaLabel="Sort ideas" />
+                </div>
+                <div className="w-36">
+                  <GlassSelect value={submitterFilter} onChange={setSubmitterFilter} options={submitters} placeholder="Anyone" ariaLabel="Filter by submitter" />
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {name && (
+                  <button
+                    onClick={() => setSubmitterFilter(submitterFilter === name ? "" : name)}
+                    aria-pressed={submitterFilter === name}
+                    className={`glass-pill text-[11px] px-3 min-h-[36px] ${submitterFilter === name ? "font-bold glass-active" : "opacity-70"}`}
+                  >
+                    My ideas
+                  </button>
+                )}
+                <button
+                  onClick={() => setNeedsCheckInOnly((v) => !v)}
+                  aria-pressed={needsCheckInOnly}
+                  className={`glass-pill text-[11px] px-3 min-h-[36px] ${needsCheckInOnly ? "font-bold glass-active" : "opacity-70"}`}
+                >
+                  Needs check-in
+                </button>
+                {FORMATS.map((f) => (
+                  <button
+                    key={f.value}
+                    onClick={() => setFormatFilter(formatFilter === f.value ? "" : f.value)}
+                    aria-pressed={formatFilter === f.value}
+                    className={`glass-pill text-[11px] px-3 min-h-[36px] ${formatFilter === f.value ? "font-bold glass-active" : "opacity-70"}`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => {
+                    setFormatFilter("");
+                    setSubmitterFilter("");
+                    setNeedsCheckInOnly(false);
+                    setSort("newest");
+                  }}
+                  className="text-xs text-red-500/80 underline"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* D4: backlog funnel — quiet, secondary context under the tabs */}
+          {funnelTotal > 1 && (
+            <div className="mx-3 mt-3 h-1.5 rounded-full overflow-hidden flex glass-pill" aria-hidden="true">
+              <div style={{ width: `${(poolCount / funnelTotal) * 100}%`, background: "var(--pale-sky)" }} />
+              <div style={{ width: `${(progressCount / funnelTotal) * 100}%`, background: "var(--thistle)" }} />
+              <div style={{ width: `${(doneCount / funnelTotal) * 100}%`, background: "var(--azure-mist)" }} />
+            </div>
+          )}
+
           <main className="p-3 lg:hidden">
             {(() => {
               const list = applyFiltersAndSort(ideas.filter((i) => i.status === activeMobileSection));
