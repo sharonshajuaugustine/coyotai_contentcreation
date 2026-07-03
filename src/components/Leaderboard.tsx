@@ -51,7 +51,7 @@ export default function Leaderboard({ ideas }: { ideas: Idea[] }) {
     <div className="space-y-3">
       {bw && (
         <div className="glass-card p-3 flex gap-4 text-xs text-taupe/80 flex-wrap">
-          <span>🏆 Best format: <strong>{bw.best.label}</strong> (avg score {bw.best.avgScore})</span>
+          <span>🏆 Best video style: <strong>{bw.best.label}</strong> (avg score {bw.best.avgScore})</span>
           <span>📉 Needs work: <strong>{bw.worst.label}</strong> (avg score {bw.worst.avgScore})</span>
         </div>
       )}
@@ -98,7 +98,7 @@ export default function Leaderboard({ ideas }: { ideas: Idea[] }) {
 
       {stats.length > 0 && (
         <div className="glass-card p-4">
-          <h2 className="text-sm font-semibold text-taupe mb-2">By format</h2>
+          <h2 className="text-sm font-semibold text-taupe mb-2">By video style</h2>
           <ul className="space-y-1 text-xs text-taupe/80">
             {stats.map((s) => (
               <li key={s.format} className="flex justify-between glass-pill px-3 py-1.5">

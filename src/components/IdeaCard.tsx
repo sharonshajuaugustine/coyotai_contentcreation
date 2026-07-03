@@ -1,11 +1,12 @@
 "use client";
-import { MessageCircle, Archive, ArrowRight, Info, Clock } from "lucide-react";
+import { MessageCircle, Archive, ArrowRight, Info, Clock, Layers } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
-import type { Idea } from "@/lib/types";
+import type { Idea, Series } from "@/lib/types";
 import { FORMATS } from "@/lib/types";
 import { relativeTime } from "@/lib/relativeTime";
 import { colorForName, avatarForName } from "@/lib/identityVisual";
 import { weightBreakdown } from "@/lib/weight";
+import { swatchColor, swatchForFormat } from "@/lib/palette";
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -15,17 +16,20 @@ export default function IdeaCard({
   onOpen,
   onQuickArchive,
   onQuickAdvance,
+  series,
 }: {
   idea: Idea;
   weight: number;
   onOpen: () => void;
   onQuickArchive?: () => void;
   onQuickAdvance?: () => void;
+  series?: Series;
 }) {
   const big = weight >= 4;
   const formatLabel = FORMATS.find((f) => f.value === idea.format)?.label;
   const b = weightBreakdown(idea);
   const breakdownText = `Size breakdown: base ${b.base} + description ${b.description} + images ${b.images} + comments ${b.comments} + performance ${b.performance}`;
+  const tint = series ? swatchColor(series.color) : swatchColor(swatchForFormat(idea.format));
 
   const perf = idea.performance_logs ?? [];
   const sparkData = [...perf]
@@ -39,6 +43,7 @@ export default function IdeaCard({
       onClick={onOpen}
       tabIndex={-1}
       aria-label={`Open idea: ${idea.title}, submitted by ${idea.submitted_by}`}
+      style={{ "--tile-tint": tint } as React.CSSProperties}
       className={`group glass-card status-border-${idea.status} h-full w-full min-h-[44px] text-left p-4 flex flex-col justify-between overflow-hidden relative`}
     >
       <div className="absolute top-2 right-2 flex items-center gap-1">
@@ -53,11 +58,18 @@ export default function IdeaCard({
         </span>
       </div>
       <div>
-        {formatLabel && (
-          <span className="glass-pill inline-block text-[11px] px-2 py-0.5 mb-2 text-taupe/80">
-            {formatLabel}
-          </span>
-        )}
+        <div className="flex items-center gap-1 flex-wrap mb-2">
+          {series && (
+            <span className="glass-pill inline-flex items-center gap-1 text-[11px] px-2 py-0.5 text-taupe/80 font-medium">
+              <Layers size={10} aria-hidden="true" /> {series.name}
+            </span>
+          )}
+          {formatLabel && (
+            <span className="glass-pill inline-block text-[11px] px-2 py-0.5 text-taupe/80">
+              {formatLabel}
+            </span>
+          )}
+        </div>
         <h3 className={`font-semibold text-taupe ${big ? "text-lg" : "text-sm"} line-clamp-2 pr-8`}>
           {idea.title}
         </h3>
@@ -100,7 +112,7 @@ export default function IdeaCard({
       </div>
 
       {(onQuickArchive || onQuickAdvance) && (
-        <div className="absolute inset-x-0 bottom-0 hidden group-hover:flex justify-end gap-1 p-2 bg-gradient-to-t from-white/50 to-transparent">
+        <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 p-2 bg-gradient-to-t from-white/50 to-transparent opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           {onQuickAdvance && (
             <span
               role="button"

@@ -15,8 +15,9 @@ import {
   SlidersHorizontal,
   MoreVertical,
   X,
+  Layers,
 } from "lucide-react";
-import type { Idea, IdeaStatus } from "@/lib/types";
+import type { Idea, IdeaStatus, Series } from "@/lib/types";
 import { FORMATS } from "@/lib/types";
 import BentoGrid from "@/components/BentoGrid";
 import IdeaModal from "@/components/IdeaModal";
@@ -62,6 +63,7 @@ export default function Home() {
 
 function Board() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [series, setSeries] = useState<Series[]>([]);
   const [selected, setSelected] = useState<Idea | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [view, setView] = useState<"board" | "leaderboard" | "archived">("board");
@@ -70,6 +72,7 @@ function Board() {
   const [query, setQuery] = useState("");
   const [formatFilter, setFormatFilter] = useState("");
   const [submitterFilter, setSubmitterFilter] = useState("");
+  const [seriesFilter, setSeriesFilter] = useState("");
   const [needsCheckInOnly, setNeedsCheckInOnly] = useState(false);
   const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("newest");
   const [density, setDensity] = useState<"comfortable" | "compact">(
@@ -101,7 +104,10 @@ function Board() {
     setSelected(idea);
     const params = new URLSearchParams(searchParams.toString());
     params.set("idea", idea.id);
-    router.replace(`/?${params.toString()}`, { scroll: false });
+    // push (not replace): gives the modal a real history entry, so a
+    // single back press closes it instead of navigating away from the
+    // app entirely and losing whatever was being typed inside it.
+    router.push(`/?${params.toString()}`, { scroll: false });
   }
 
   function closeIdea() {
@@ -140,15 +146,29 @@ function Board() {
     }
   }, []);
 
+  const loadSeries = useCallback(async () => {
+    try {
+      const res = await fetch("/api/series");
+      const json = await res.json();
+      if (Array.isArray(json)) setSeries(json);
+    } catch {
+      // non-critical - board still works without series loaded
+    }
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadSeries();
+  }, [load, loadSeries]);
 
   // F8: open the deep-linked idea (?idea=<id>) once it's loaded.
   useEffect(() => {
     if (deepLinkedIdea && ideas.length) {
       const found = ideas.find((i) => i.id === deepLinkedIdea);
       if (found) setSelected(found);
+    } else if (!deepLinkedIdea) {
+      // URL's idea param cleared (e.g. back button) - close the modal to match.
+      setSelected(null);
     }
   }, [deepLinkedIdea, ideas]);
 
@@ -185,16 +205,33 @@ function Board() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // C3: very subtle wallpaper parallax on desktop mouse move.
+  // C3: subtle wallpaper parallax — mouse move on desktop, device tilt on
+  // phones (falls back to touch-drag if orientation isn't available/granted).
   useEffect(() => {
-    function onMove(e: MouseEvent) {
-      const x = (e.clientX / window.innerWidth - 0.5) * 20;
-      const y = (e.clientY / window.innerHeight - 0.5) * 20;
+    function setParallax(x: number, y: number) {
       wallpaperRef.current?.style.setProperty("--px", `${x}px`);
       wallpaperRef.current?.style.setProperty("--py", `${y}px`);
     }
-    window.addEventListener("mousemove", onMove);
-    return () => window.removeEventListener("mousemove", onMove);
+    function onMouseMove(e: MouseEvent) {
+      setParallax((e.clientX / window.innerWidth - 0.5) * 20, (e.clientY / window.innerHeight - 0.5) * 20);
+    }
+    function onTouchMove(e: TouchEvent) {
+      const t = e.touches[0];
+      if (!t) return;
+      setParallax((t.clientX / window.innerWidth - 0.5) * 16, (t.clientY / window.innerHeight - 0.5) * 16);
+    }
+    function onOrientation(e: DeviceOrientationEvent) {
+      if (e.gamma == null || e.beta == null) return;
+      setParallax(Math.max(-16, Math.min(16, e.gamma)), Math.max(-16, Math.min(16, (e.beta - 45) / 2)));
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("deviceorientation", onOrientation);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("deviceorientation", onOrientation);
+    };
   }, []);
 
   const submitters = useMemo(
@@ -202,6 +239,8 @@ function Board() {
     [ideas]
   );
   const allNames = useMemo(() => Array.from(new Set(ideas.map((i) => i.submitted_by))), [ideas]);
+  const seriesMap = useMemo(() => Object.fromEntries(series.map((s) => [s.id, s])), [series]);
+  const seriesOptions = useMemo(() => series.map((s) => ({ value: s.id, label: s.name })), [series]);
 
   function needsCheckIn(idea: Idea) {
     return (
@@ -215,6 +254,7 @@ function Board() {
     let out = list.filter((i) => {
       if (formatFilter && i.format !== formatFilter) return false;
       if (submitterFilter && i.submitted_by !== submitterFilter) return false;
+      if (seriesFilter && i.series_id !== seriesFilter) return false;
       if (needsCheckInOnly && !needsCheckIn(i)) return false;
       if (query.trim()) {
         const q = query.toLowerCase();
@@ -242,7 +282,11 @@ function Board() {
   }
 
   const activeFilterCount =
-    (formatFilter ? 1 : 0) + (submitterFilter ? 1 : 0) + (needsCheckInOnly ? 1 : 0) + (sort !== "newest" ? 1 : 0);
+    (formatFilter ? 1 : 0) +
+    (submitterFilter ? 1 : 0) +
+    (seriesFilter ? 1 : 0) +
+    (needsCheckInOnly ? 1 : 0) +
+    (sort !== "newest" ? 1 : 0);
   const isFiltering = query.trim().length > 0 || activeFilterCount > 0;
 
   function vibrate() {
@@ -412,7 +456,7 @@ function Board() {
               {EMPTY_COPY.archived}
             </div>
           ) : (
-            <BentoGrid ideas={archivedIdeas} onOpen={openIdea} density={density} />
+            <BentoGrid ideas={archivedIdeas} onOpen={openIdea} density={density} seriesMap={seriesMap} />
           )}
         </main>
       )}
@@ -469,6 +513,9 @@ function Board() {
                 <div className="w-36">
                   <GlassSelect value={submitterFilter} onChange={setSubmitterFilter} options={submitters} placeholder="Anyone" ariaLabel="Filter by submitter" />
                 </div>
+                <div className="w-40">
+                  <GlassSelect value={seriesFilter} onChange={setSeriesFilter} options={seriesOptions} placeholder="Any series" ariaLabel="Filter by series" />
+                </div>
               </div>
               <div className="flex gap-2 flex-wrap">
                 {name && (
@@ -503,6 +550,7 @@ function Board() {
                   onClick={() => {
                     setFormatFilter("");
                     setSubmitterFilter("");
+                    setSeriesFilter("");
                     setNeedsCheckInOnly(false);
                     setSort("newest");
                   }}
@@ -540,7 +588,7 @@ function Board() {
                   </div>
                 );
               }
-              return <BentoGrid ideas={list} onOpen={openIdea} density={density} onQuickArchive={quickArchive} onQuickAdvance={quickAdvance} />;
+              return <BentoGrid ideas={list} onOpen={openIdea} density={density} onQuickArchive={quickArchive} onQuickAdvance={quickAdvance} seriesMap={seriesMap} />;
             })()}
           </main>
 
@@ -558,7 +606,7 @@ function Board() {
                       {EMPTY_COPY[s.key]}
                     </div>
                   ) : (
-                    <BentoGrid ideas={list} onOpen={openIdea} density={density} onQuickArchive={quickArchive} onQuickAdvance={quickAdvance} />
+                    <BentoGrid ideas={list} onOpen={openIdea} density={density} onQuickArchive={quickArchive} onQuickAdvance={quickAdvance} seriesMap={seriesMap} />
                   )}
                 </div>
               );
@@ -577,9 +625,24 @@ function Board() {
       </button>
 
       {selectedFresh && (
-        <IdeaModal idea={selectedFresh} onClose={closeIdea} onChanged={load} allNames={allNames} />
+        <IdeaModal
+          idea={selectedFresh}
+          onClose={closeIdea}
+          onChanged={load}
+          allNames={allNames}
+          series={series}
+          onSeriesCreated={loadSeries}
+        />
       )}
-      {showForm && <IdeaForm onClose={() => setShowForm(false)} onCreated={load} existingIdeas={ideas} />}
+      {showForm && (
+        <IdeaForm
+          onClose={() => setShowForm(false)}
+          onCreated={load}
+          existingIdeas={ideas}
+          series={series}
+          onSeriesCreated={loadSeries}
+        />
+      )}
     </div>
   );
 }

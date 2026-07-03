@@ -12,10 +12,31 @@ export type Idea = {
   pinned: boolean;
   last_edited_by: string | null;
   size_override: "small" | "large" | null;
+  series_id: string | null;
+  assigned_to: string | null;
   created_at: string;
   updated_at: string;
   comments?: Comment[];
   performance_logs?: PerformanceLog[];
+  idea_handoffs?: Handoff[];
+};
+
+export type Handoff = {
+  id: string;
+  idea_id: string;
+  from_name: string | null;
+  to_name: string;
+  changed_by: string;
+  created_at: string;
+};
+
+export type Series = {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  created_by: string;
+  created_at: string;
 };
 
 export type Comment = {

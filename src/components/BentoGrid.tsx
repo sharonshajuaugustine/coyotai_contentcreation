@@ -1,7 +1,7 @@
 "use client";
 import { useId, useRef } from "react";
 import { motion, LayoutGroup } from "framer-motion";
-import type { Idea } from "@/lib/types";
+import type { Idea, Series } from "@/lib/types";
 import { computeWeight, spanForWeight } from "@/lib/weight";
 import IdeaCard from "./IdeaCard";
 
@@ -11,12 +11,14 @@ export default function BentoGrid({
   density = "comfortable",
   onQuickArchive,
   onQuickAdvance,
+  seriesMap,
 }: {
   ideas: Idea[];
   onOpen: (idea: Idea) => void;
   density?: "comfortable" | "compact";
   onQuickArchive?: (idea: Idea) => void;
   onQuickAdvance?: (idea: Idea) => void;
+  seriesMap?: Record<string, Series>;
 }) {
   const gridRef = useRef<HTMLDivElement>(null);
   const groupId = useId();
@@ -80,6 +82,7 @@ export default function BentoGrid({
                   onOpen={() => onOpen(idea)}
                   onQuickArchive={onQuickArchive ? () => onQuickArchive(idea) : undefined}
                   onQuickAdvance={onQuickAdvance ? () => onQuickAdvance(idea) : undefined}
+                  series={idea.series_id ? seriesMap?.[idea.series_id] : undefined}
                 />
               </motion.div>
             </motion.div>

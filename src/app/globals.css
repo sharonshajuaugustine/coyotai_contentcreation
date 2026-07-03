@@ -56,16 +56,18 @@ body {
   z-index: 30;
 }
 
-/* Glass HUD + neumorphism hybrid surface */
+/* Glass HUD + neumorphism hybrid surface. --tile-tint lets individual
+   bento tiles (set via inline style) tint their glass a different pastel
+   shade, e.g. per-series color, while everything else keeps the default. */
 .glass-card {
-  background: color-mix(in srgb, var(--azure-mist) 82%, transparent);
+  background: color-mix(in srgb, var(--tile-tint, var(--azure-mist)) 82%, transparent);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   border: 1px solid color-mix(in srgb, var(--thistle) 60%, transparent);
   border-radius: 22px;
   box-shadow:
     8px 8px 20px color-mix(in srgb, var(--taupe-grey) 12%, transparent),
-    -6px -6px 16px color-mix(in srgb, var(--pale-sky) 55%, transparent);
+    -6px -6px 16px color-mix(in srgb, var(--tile-tint, var(--pale-sky)) 55%, transparent);
   transition: transform 0.35s ease, box-shadow 0.35s ease;
 }
 
@@ -73,7 +75,7 @@ body {
   transform: translateY(-2px);
   box-shadow:
     10px 10px 26px color-mix(in srgb, var(--taupe-grey) 16%, transparent),
-    -8px -8px 20px color-mix(in srgb, var(--pale-sky) 65%, transparent);
+    -8px -8px 20px color-mix(in srgb, var(--tile-tint, var(--pale-sky)) 65%, transparent);
 }
 
 .glass-input {
@@ -113,8 +115,8 @@ body {
 }
 
 @keyframes tile-breathe {
-  0%, 100% { box-shadow: 6px 6px 16px color-mix(in srgb, var(--taupe-grey) 10%, transparent), -6px -6px 14px color-mix(in srgb, var(--pale-sky) 50%, transparent); }
-  50% { box-shadow: 8px 8px 22px color-mix(in srgb, var(--taupe-grey) 14%, transparent), -8px -8px 18px color-mix(in srgb, var(--pale-sky) 60%, transparent); }
+  0%, 100% { box-shadow: 6px 6px 16px color-mix(in srgb, var(--taupe-grey) 10%, transparent), -6px -6px 14px color-mix(in srgb, var(--tile-tint, var(--pale-sky)) 50%, transparent); }
+  50% { box-shadow: 8px 8px 22px color-mix(in srgb, var(--taupe-grey) 14%, transparent), -8px -8px 18px color-mix(in srgb, var(--tile-tint, var(--pale-sky)) 60%, transparent); }
 }
 
 .tile-breathe {

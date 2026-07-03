@@ -1,12 +1,16 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Sparkles, Wand2 } from "lucide-react";
-import type { Idea } from "@/lib/types";
+import type { Idea, Series } from "@/lib/types";
 import { FORMATS } from "@/lib/types";
 import { useIdentity } from "@/lib/useIdentity";
+import { useModalBackGuard } from "@/lib/useModalBackGuard";
 import GlassSelect from "./GlassSelect";
+import SeriesPicker from "./SeriesPicker";
+
+const DRAFT_KEY = "coyot_new_idea_draft";
 
 function similar(a: string, b: string): boolean {
   const na = a.trim().toLowerCase();
@@ -16,19 +20,36 @@ function similar(a: string, b: string): boolean {
   return na.includes(nb) || nb.includes(na);
 }
 
+function loadDraft(): { title: string; description: string; format: string; seriesId: string } {
+  if (typeof window === "undefined") return { title: "", description: "", format: "", seriesId: "" };
+  try {
+    return (
+      JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "null") ?? { title: "", description: "", format: "", seriesId: "" }
+    );
+  } catch {
+    return { title: "", description: "", format: "", seriesId: "" };
+  }
+}
+
 export default function IdeaForm({
   onClose,
   onCreated,
   existingIdeas = [],
+  series = [],
+  onSeriesCreated,
 }: {
   onClose: () => void;
   onCreated: () => void;
   existingIdeas?: Idea[];
+  series?: Series[];
+  onSeriesCreated?: () => void;
 }) {
   const { name, setName } = useIdentity();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [format, setFormat] = useState("");
+  const initialDraft = loadDraft();
+  const [title, setTitle] = useState(initialDraft.title);
+  const [description, setDescription] = useState(initialDraft.description);
+  const [format, setFormat] = useState(initialDraft.format);
+  const [seriesId, setSeriesId] = useState(initialDraft.seriesId);
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [clarify, setClarify] = useState("");
@@ -39,6 +60,42 @@ export default function IdeaForm({
   const [errors, setErrors] = useState<{ name?: string; title?: string }>({});
 
   const duplicate = title.trim() ? existingIdeas.find((i) => similar(i.title, title)) : null;
+  const hasContent = title.trim().length > 0 || description.trim().length > 0;
+
+  // Prevents the back button/gesture from navigating away and silently
+  // discarding whatever's been typed - closes the form instead.
+  useModalBackGuard(onClose);
+
+  // Recovered a draft from a previous accidental close/reload? Let the
+  // user know rather than silently pre-filling the form.
+  useEffect(() => {
+    if (initialDraft.title || initialDraft.description) {
+      toast("Restored your unsaved draft");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist the draft as the user types, so an accidental tab close or
+  // reload doesn't lose it either - not just the back-button case.
+  useEffect(() => {
+    if (hasContent) {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ title, description, format, seriesId }));
+    } else {
+      sessionStorage.removeItem(DRAFT_KEY);
+    }
+  }, [title, description, format, seriesId, hasContent]);
+
+  // Warn on tab close / hard reload too, not just in-app navigation.
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (hasContent) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasContent]);
 
   async function askClarify() {
     if (!title.trim() || loadingClarify) return;
@@ -90,10 +147,10 @@ export default function IdeaForm({
       const json = await res.json();
       if (json.format) {
         setFormat(json.format);
-        toast.success("Format suggested");
-      } else toast.error("Couldn't suggest a format.");
+        toast.success("Video style suggested");
+      } else toast.error("Couldn't suggest a video style.");
     } catch {
-      toast.error("Couldn't suggest a format.");
+      toast.error("Couldn't suggest a video style.");
     } finally {
       setLoadingFormat(false);
     }
@@ -122,10 +179,18 @@ export default function IdeaForm({
     const res = await fetch("/api/ideas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ submitted_by: name, title, description, format: format || null, images }),
+      body: JSON.stringify({
+        submitted_by: name,
+        title,
+        description,
+        format: format || null,
+        images,
+        series_id: seriesId || null,
+      }),
     });
     setSaving(false);
     if (!res.ok) return toast.error("Couldn't save idea.");
+    sessionStorage.removeItem(DRAFT_KEY);
     toast.success("Idea added to the pool");
     onCreated();
     onClose();
@@ -182,14 +247,22 @@ export default function IdeaForm({
               value={format}
               onChange={setFormat}
               options={[...FORMATS]}
-              placeholder="Format (optional)"
-              ariaLabel="Format"
+              placeholder="Video style (optional)"
+              ariaLabel="Video style"
             />
           </div>
-          <button onClick={suggestFormat} aria-label="Suggest format with AI" className="glass-pill p-2 min-h-[44px]" disabled={loadingFormat}>
+          <button onClick={suggestFormat} aria-label="Suggest video style with AI" className="glass-pill p-2 min-h-[44px]" disabled={loadingFormat}>
             <Wand2 size={14} aria-hidden="true" />
           </button>
         </div>
+
+        <SeriesPicker
+          value={seriesId}
+          onChange={setSeriesId}
+          series={series}
+          authorName={name}
+          onSeriesCreated={() => onSeriesCreated?.()}
+        />
 
         <div
           onDragOver={(e) => {

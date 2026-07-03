@@ -3,10 +3,7 @@ import { supabaseServer } from "@/lib/supabase";
 
 export async function GET() {
   const sb = supabaseServer();
-  const { data, error } = await sb
-    .from("ideas")
-    .select("*, comments(*), performance_logs(*)")
-    .order("created_at", { ascending: false });
+  const { data, error } = await sb.from("series").select("*").order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
@@ -15,14 +12,12 @@ export async function POST(req: Request) {
   const body = await req.json();
   const sb = supabaseServer();
   const { data, error } = await sb
-    .from("ideas")
+    .from("series")
     .insert({
-      submitted_by: body.submitted_by,
-      title: body.title,
+      name: body.name,
       description: body.description ?? "",
-      format: body.format ?? null,
-      images: body.images ?? [],
-      series_id: body.series_id ?? null,
+      color: body.color ?? "pale-sky",
+      created_by: body.created_by,
     })
     .select()
     .single();

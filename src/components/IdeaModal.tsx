@@ -3,24 +3,29 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Trash2, RotateCcw, X, Pin, PinOff, Pencil, Sparkles, Maximize2, Minimize2, Check } from "lucide-react";
-import type { Idea, IdeaStatus, Comment } from "@/lib/types";
+import { Trash2, RotateCcw, X, Pin, PinOff, Pencil, Sparkles, Maximize2, Minimize2, Check, UserPlus, ArrowRight } from "lucide-react";
+import type { Idea, IdeaStatus, Comment, Series } from "@/lib/types";
 import { FORMATS } from "@/lib/types";
 import { useIdentity } from "@/lib/useIdentity";
 import { relativeTime } from "@/lib/relativeTime";
 import { avatarForName } from "@/lib/identityVisual";
 import { burstConfetti } from "@/lib/confetti";
+import SeriesPicker from "./SeriesPicker";
 
 export default function IdeaModal({
   idea,
   onClose,
   onChanged,
   allNames = [],
+  series = [],
+  onSeriesCreated,
 }: {
   idea: Idea;
   onClose: () => void;
   onChanged: () => void;
   allNames?: string[];
+  series?: Series[];
+  onSeriesCreated?: () => void;
 }) {
   const { name, setName } = useIdentity();
   const [comment, setComment] = useState("");
@@ -40,13 +45,52 @@ export default function IdeaModal({
   const [editingDesc, setEditingDesc] = useState(false);
   const [titleDraft, setTitleDraft] = useState(idea.title);
   const [descDraft, setDescDraft] = useState(idea.description);
+  const [assigneeDraft, setAssigneeDraft] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [handoffs, setHandoffs] = useState<Idea["idea_handoffs"]>([]);
 
   const commentInputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
+  // Guards against losing an in-progress comment, performance entry, or
+  // unsaved title/description edit on tab close/reload. Back-button safety
+  // for this modal is handled at the router level in page.tsx (it pushes
+  // a real history entry on open), not here.
+  const hasUnsavedInput =
+    comment.trim().length > 0 ||
+    perf.views !== "" ||
+    perf.likes !== "" ||
+    perf.saves !== "" ||
+    (editingTitle && titleDraft !== idea.title) ||
+    (editingDesc && descDraft !== idea.description);
+
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (hasUnsavedInput) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsavedInput]);
+
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ block: "nearest" });
     commentInputRef.current?.focus();
+  }, [idea.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/ideas/${idea.id}/handoff`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) setHandoffs(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [idea.id]);
 
   async function patchIdea(body: Record<string, unknown>) {
@@ -70,6 +114,29 @@ export default function IdeaModal({
     const res = await patchIdea({ pinned: !idea.pinned });
     if (!res.ok) return toast.error("Couldn't update pin.");
     toast.success(idea.pinned ? "Unpinned" : "Pinned to top");
+    onChanged();
+  }
+
+  async function setSeries(seriesId: string) {
+    const res = await patchIdea({ series_id: seriesId || null });
+    if (!res.ok) return toast.error("Couldn't update series.");
+    onChanged();
+  }
+
+  async function assignTo(to: string) {
+    if (!to.trim() || assigning) return;
+    setAssigning(true);
+    const res = await fetch(`/api/ideas/${idea.id}/handoff`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, changed_by: name || "Anon" }),
+    });
+    setAssigning(false);
+    if (!res.ok) return toast.error("Couldn't assign idea.");
+    const newHandoff = await res.json();
+    toast.success(`Assigned to ${to}`);
+    setAssigneeDraft("");
+    setHandoffs((prev) => [newHandoff, ...(prev ?? [])]);
     onChanged();
   }
 
@@ -349,6 +416,74 @@ export default function IdeaModal({
           )}
         </div>
 
+        {!isArchived && (
+          <div className="mb-3">
+            <SeriesPicker
+              value={idea.series_id ?? ""}
+              onChange={setSeries}
+              series={series}
+              authorName={name}
+              onSeriesCreated={() => onSeriesCreated?.()}
+            />
+          </div>
+        )}
+
+        {!isArchived && (
+          <div className="mb-3">
+            <div className="flex items-center gap-2 text-xs text-taupe/70 mb-1.5">
+              <UserPlus size={12} aria-hidden="true" />
+              {idea.assigned_to ? (
+                <span>
+                  Assigned to <strong className="text-taupe">{idea.assigned_to}</strong>
+                </span>
+              ) : (
+                <span>Unassigned</span>
+              )}
+            </div>
+            <div className="flex gap-2 flex-wrap items-center">
+              <input
+                list="assignee-names"
+                className="glass-input flex-1 text-sm min-h-[40px] min-w-[140px]"
+                placeholder="Assign to..."
+                value={assigneeDraft}
+                onChange={(e) => setAssigneeDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && assignTo(assigneeDraft)}
+              />
+              <datalist id="assignee-names">
+                {allNames.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
+              <button
+                onClick={() => assignTo(assigneeDraft)}
+                className="glass-pill text-xs px-3 py-2 min-h-[40px]"
+                disabled={assigning || !assigneeDraft.trim()}
+              >
+                Assign
+              </button>
+              {name && idea.assigned_to !== name && (
+                <button onClick={() => assignTo(name)} className="glass-pill text-xs px-3 py-2 min-h-[40px]" disabled={assigning}>
+                  Assign to me
+                </button>
+              )}
+            </div>
+            {(handoffs ?? []).length > 0 && (
+              <ul className="mt-2 space-y-1 text-[11px] text-taupe/60">
+                {[...(handoffs ?? [])]
+                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                  .map((h) => (
+                    <li key={h.id} className="flex items-center gap-1">
+                      {h.from_name ? <span>{h.from_name}</span> : <span className="italic">unassigned</span>}
+                      <ArrowRight size={10} aria-hidden="true" />
+                      <span>{h.to_name}</span>
+                      <span className="text-taupe/40">· by {h.changed_by} · {relativeTime(h.created_at)}</span>
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         {editingTitle ? (
           <div className="flex gap-2 items-center pr-8">
             <input
@@ -369,7 +504,7 @@ export default function IdeaModal({
                 setEditingTitle(true);
               }}
               aria-label="Edit title"
-              className="opacity-0 group-hover:opacity-100 text-taupe/50"
+              className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-taupe/50 transition-opacity"
             >
               <Pencil size={14} aria-hidden="true" />
             </button>
@@ -711,12 +846,12 @@ function CommentRow({
       {comment.body}
       {comment.edited_at && <span className="text-taupe/40"> (edited)</span>}
       {comment.resolved && <span className="text-green-600"> ✓ resolved</span>}
-      <span className="ml-2 opacity-0 group-hover:opacity-100 inline-flex gap-2 text-[10px] text-taupe/50">
-        {onReply && <button onClick={onReply}>reply</button>}
-        <button onClick={onStartEdit}>edit</button>
-        <button onClick={onDelete}>delete</button>
+      <span className="ml-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 inline-flex gap-2 text-[10px] text-taupe/50 transition-opacity">
+        {onReply && <button onClick={onReply} className="py-1">reply</button>}
+        <button onClick={onStartEdit} className="py-1">edit</button>
+        <button onClick={onDelete} className="py-1">delete</button>
         {onToggleResolve && (
-          <button onClick={onToggleResolve} className="flex items-center gap-0.5">
+          <button onClick={onToggleResolve} className="flex items-center gap-0.5 py-1">
             <Check size={10} aria-hidden="true" /> {comment.resolved ? "unresolve" : "resolve"}
           </button>
         )}
